@@ -74,7 +74,31 @@ def pcl_callback(pcl_msg):
     # Finally call the filter function for magic
     cloud_filtered = outlier_filter.filter()
 
-    # TODO: Voxel Grid Downsampling
+    ##### Voxel Grid Downsampling #####
+
+    """The point clouds from RGB-D cameras are too dense, hence computationally expensive. Downsampling 
+    the point cloud data to reduce density but preserve important information is ideal.
+
+    Using a Voxel Grid Filter where a grid of volumetric elements (voxels; as pixel is to picture element)
+    is made and each voxel is averaged to a point cloud element; downsampled."""
+
+    # Create a VoxelGrid filter object for our input point cloud
+    vox = cloud_filtered.make_voxel_grid_filter()
+
+    """Choose a voxel (also known as leaf) size (units in meters).
+    Should start small and keep going large till loss of important information starts."""
+
+    """A good way to choose leaf size is knowing the important information data forehand 
+    such as smallest (or target) object size."""
+    LEAF_SIZE = 0.01
+    """A voxel (leaf) size of 0.01 results in a voxel of 1e-6 cubic meters that retains
+    most of the important information, while significantly reducing the number of points in the cloud."""  
+
+    # Set the voxel (or leaf) size. 
+    vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
+
+    # Call the filter function to obtain the resultant downsampled point cloud.
+    cloud_filtered = vox.filter()
 
     # TODO: PassThrough Filter
 
