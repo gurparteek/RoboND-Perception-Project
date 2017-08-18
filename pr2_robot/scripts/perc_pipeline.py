@@ -49,11 +49,30 @@ def send_to_yaml(yaml_filename, dict_list):
 # Callback function for your Point Cloud Subscriber
 def pcl_callback(pcl_msg):
 
-# Exercise-2 TODOs:
+# Add Exercise-2 Code:
 
-    # TODO: Convert ROS msg to PCL data
+    ##### Convert ROS msg to PCL data #####
+
+    """Convert ROS msg (type PointCloud2) to PCL data (PointXYZRGB format)
+    with helper function from pcl_helper."""
+    cloud = ros_to_pcl(pcl_msg)
     
-    # TODO: Statistical Outlier Filtering
+    ##### Statistical Outlier Filtering #####
+
+    # Creating a filter object.
+    outlier_filter = cloud.make_statistical_outlier_filter()
+
+    # Set the number of neighboring points to analyze for any given point
+    outlier_filter.set_mean_k(10)
+
+    # Set threshold scale factor
+    x = 0.001
+
+    # Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
+    outlier_filter.set_std_dev_mul_thresh(x)
+
+    # Finally call the filter function for magic
+    cloud_filtered = outlier_filter.filter()
 
     # TODO: Voxel Grid Downsampling
 
@@ -67,12 +86,17 @@ def pcl_callback(pcl_msg):
 
     # TODO: Create Cluster-Mask Point Cloud to visualize each cluster separately
 
-    # TODO: Convert PCL data to ROS messages
+    ##### Convert PCL data to ROS messages #####
+
+    """Convert PCL data (PointXYZRGB format) to ROS msg (type PointCloud2)
+    with helper function from pcl_helper."""
+    ros_cloud_objects = pcl_to_ros(cloud_filtered)
+    ros_cloud_table = pcl_to_ros(cloud_filtered)
 
     ##### Publish ROS messages #####
     #This is just for testing so we publish the whole input itself.
-    pcl_objects_pub.publish(pcl_msg)
-    pcl_table_pub.publish(pcl_msg)
+    pcl_objects_pub.publish(ros_cloud_objects)
+    pcl_table_pub.publish(ros_cloud_table)
 
 # Exercise-3 TODOs:
 
