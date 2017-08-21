@@ -100,7 +100,30 @@ def pcl_callback(pcl_msg):
     # Call the filter function to obtain the resultant downsampled point cloud.
     cloud_filtered = vox.filter()
 
-    # TODO: PassThrough Filter
+    ##### PassThrough filter #####
+
+    """More points in cloud = more coumputation; so if the target object location is known,
+    the rest of the point cloud is not needed."""
+
+    """A pass through filter is like a cropping tool. We specify an axis along which we know the limits
+    within which the target objects lie, known as the region of interest. The pass through filter passes 
+    through the cloud leaving only the region of interest."""
+
+    # Create a PassThrough filter object.
+    passthrough = cloud_filtered.make_passthrough_filter()
+
+    # Assign axis and range to the passthrough filter object.
+    # Applying the filter along z axis (the height with respect to the ground) to our tabletop scene.
+    filter_axis = 'z'
+    passthrough.set_filter_field_name (filter_axis)
+    # Setting axis values to keep only the objects and the flat table top.
+    axis_min = 0.605
+    axis_max = 0.72
+    # The axis min and max sets the region of interest that the filter leaves out as a window as it passes.
+    passthrough.set_filter_limits (axis_min, axis_max)
+
+    # Finally use the filter function to obtain the resultant point cloud. 
+    cloud_filtered = passthrough.filter()
 
     # TODO: RANSAC Plane Segmentation
 
