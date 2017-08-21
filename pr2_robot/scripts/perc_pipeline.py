@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+NOTE: Need the sensor_stick dir from the Perception Exercise 3, to be in the src directory of the 
+catkin_ws along with RoboND-Perception-Project (see under Exercise 3 code below for more details).
+"""
+
 # Import modules
 import numpy as np
 import sklearn
@@ -49,7 +54,7 @@ def send_to_yaml(yaml_filename, dict_list):
 # Callback function for your Point Cloud Subscriber
 def pcl_callback(pcl_msg):
 
-# Add Exercise-2 Code:
+# Add Exercise-2 Code (from segmentation.py in Exercise 2) marked by #####:
 
     ##### Convert ROS msg to PCL data #####
 
@@ -227,21 +232,60 @@ def pcl_callback(pcl_msg):
     pcl_table_pub.publish(ros_cloud_table)
     pcl_cluster_pub.publish(ros_cluster_cloud)
 
-# Exercise-3 TODOs:
+# Exercise-3 Code (from capture_features.py and features.py) marked by #####:
+    """
+    NOTE: Copy the sensor_stick directory from the Perception Ex 3 to the src in catkin_ws along with the 
+    RoboND-Perception-Project directory. Then edit the model list in capture_features.py in sensor_stick 
+    to match the models of the environment as in pick_list_(env#).yaml files in /pr2_robot/config/ and 
+    generate the features and train the SVM to those models as done in Ex 3.
+    """
 
     # Classify the clusters! (loop through each detected cluster one at a time)
-
+    detected_objects_labels = []
+    detected_objects = []
+    for index, pts_list in enumerate(cluster_indices):
         # Grab the points for the cluster
+        pcl_cluster = cloud_objects.extract(pts_list)
 
-        # Compute the associated feature vector
+        ##### Convert the cluster from pcl to ROS using helper function. #####
+        ros_cluster = pcl_to_ros(pcl_cluster)
 
-        # Make the prediction
+        ##### Extract histogram features as in capture_features.py #####
+
+        """The functions compute_color_histograms() and compute_normal_histograms() 
+        are from features.py and are explained there. The rest are in capture_features.py, 
+        both of which are in sensor_stick directory from Exercise 3 which needs to be 
+        copied to the same src directory in catkin_ws as the RoboND-Perception-Project."""
+
+        chists = compute_color_histograms(ros_cluster, using_hsv=True)
+        normals = get_normals(ros_cluster)
+        nhists = compute_normal_histograms(normals)
+
+        ##### Compute the associated feature vector #####
+        feature = np.concatenate((chists, nhists))
+
+        # Make the prediction, retrieve the label for the result
+        # and add it to detected_objects_labels list
+        prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
+        label = encoder.inverse_transform(prediction)[0]
+        detected_objects_labels.append(label)
 
         # Publish a label into RViz
+        label_pos = list(white_cloud[pts_list[0]])
+        label_pos[2] += .4
+        object_markers_pub.publish(make_label(label,label_pos, index))
 
         # Add the detected object to the list of detected objects.
+        do = DetectedObject()
+        do.label = label
+        do.cloud = ros_cluster
+        detected_objects.append(do)
+
+    rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
 
     # Publish the list of detected objects
+    # This is the output needed to complete the project.
+    detected_objects_pub.publish(detected_objects)
 
     # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
     # Could add some logic to determine whether or not your object detections are robust
@@ -309,9 +353,17 @@ if __name__ == '__main__':
     # called pcl_table and pcl_objects, respectively.
     pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
     pcl_table_pub = rospy.Publisher("/pcl_table", PointCloud2, queue_size=1)
-    
+
     # Creating a publisher to publish the point cloud data for the cluster cloud to topic called pcl_cluster.
     pcl_cluster_pub = rospy.Publisher("/pcl_cluster", PointCloud2, queue_size=1)
+
+    ##### Create New Publishers for detected objects #####
+
+    """Creating two new publishers, object_markers_pub and detected_objects_pub
+    that publish to topics "/object_markers" and "/detected_objects" with 
+    Message Types "Marker" and "DetectedObjectsArray", respectively."""
+    object_markers_pub = rospy.Publisher("/object_markers", Marker, queue_size=1)
+    detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
 
     ##### Initialize color_list #####
     # This is needed to initalize the color_list attribute of the helper function get_color_list()
