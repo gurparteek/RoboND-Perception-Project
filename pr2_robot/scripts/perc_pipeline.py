@@ -130,6 +130,24 @@ def pcl_callback(pcl_msg):
     # Finally use the filter function to obtain the resultant point cloud. 
     cloud_filtered = passthrough.filter()
 
+    # Add a second pass through filter to filter out the edges of the table that are falsely identified as objects.
+
+    # Create a PassThrough filter object.
+    passthrough = cloud_filtered.make_passthrough_filter()
+
+    # Assign axis and range to the passthrough filter object.
+    # Applying the filter along z axis (the height with respect to the ground) to our tabletop scene.
+    filter_axis = 'y'
+    passthrough.set_filter_field_name (filter_axis)
+    # Setting axis values to keep only the objects and the flat table top.
+    axis_min = -0.45
+    axis_max = 0.45
+    # The axis min and max sets the region of interest that the filter leaves out as a window as it passes.
+    passthrough.set_filter_limits (axis_min, axis_max)
+
+    # Finally use the filter function to obtain the resultant point cloud. 
+    cloud_filtered = passthrough.filter()
+
     ##### RANSAC plane segmentation #####
 
     """RANSAC (Random Sample Consensus) is a two step (hypothesis and verification) iterative method
