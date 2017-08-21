@@ -125,9 +125,44 @@ def pcl_callback(pcl_msg):
     # Finally use the filter function to obtain the resultant point cloud. 
     cloud_filtered = passthrough.filter()
 
-    # TODO: RANSAC Plane Segmentation
+    ##### RANSAC plane segmentation #####
 
-    # TODO: Extract inliers and outliers
+    """RANSAC (Random Sample Consensus) is a two step (hypothesis and verification) iterative method
+    which identifies data points belonging to a mathematical model (inliners) and those that dont (outliners)."""
+
+    """First, the model is constructed using a min. no. of data pts. (eg. two for a line) and then the rest of
+    pts. are verfied against its parameters (eg. slope and y-cutoff for a line) with certain error thresholds.
+    The set of inliers obtained for that fitting model (random sample) is called a consensus set.
+    The two steps are repeated until the obtained consensus set in certain iteration has enough inliers
+    and that sample (mathematical model parameters) forms the solution as it had the most inliners in consensus."""
+
+    # The points chosen are random so the solution is probalistic, increasing with the number of iterations.
+
+    # Create the segmentation object
+    seg = cloud_filtered.make_segmenter()
+
+    # Set the model you wish to fit.
+    # RANSAC plane fitting algorithm (calculate plane parameters and verfiy) already exists in the PCL library.
+    seg.set_model_type(pcl.SACMODEL_PLANE)
+    seg.set_method_type(pcl.SAC_RANSAC)
+
+    # Max distance for a point to be considered fitting the model.
+    # This is the error threshold for the model fit and influences (increases) the consensus set.
+    max_distance = 0.01
+    seg.set_distance_threshold(max_distance)
+
+    # Call the segment function to obtain set of inliner indices and model coefficients
+    inliers, coefficients = seg.segment()
+
+    ##### Extract inliers and outliers #####
+
+    # Extract inliers
+    extracted_inliers = cloud_filtered.extract(inliers, negative=False)
+    cloud_table = extracted_inliers
+
+    # Extract outliers using the negative flag to True.
+    extracted_outliers = cloud_filtered.extract(inliers, negative=True)
+    cloud_objects = extracted_outliers
 
     # TODO: Euclidean Clustering
 
@@ -137,8 +172,8 @@ def pcl_callback(pcl_msg):
 
     """Convert PCL data (PointXYZRGB format) to ROS msg (type PointCloud2)
     with helper function from pcl_helper."""
-    ros_cloud_objects = pcl_to_ros(cloud_filtered)
-    ros_cloud_table = pcl_to_ros(cloud_filtered)
+    ros_cloud_objects = pcl_to_ros(cloud_objects)
+    ros_cloud_table = pcl_to_ros(cloud_table)
 
     ##### Publish ROS messages #####
     #This is just for testing so we publish the whole input itself.
