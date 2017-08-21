@@ -164,9 +164,54 @@ def pcl_callback(pcl_msg):
     extracted_outliers = cloud_filtered.extract(inliers, negative=True)
     cloud_objects = extracted_outliers
 
-    # TODO: Euclidean Clustering
+    ##### Euclidean Clustering #####
 
-    # TODO: Create Cluster-Mask Point Cloud to visualize each cluster separately
+    """Euclidean Clustering is the DBSCAN algorithm as it uses the Euclidean Distance to identfy nearest neighbours, 
+    if the distance b/w is < min. distance specified, then point is added to the cluster (inliners), else outliner.
+    If the point has > (min. members of a cluster - 1) neigbours, it becomes a core member, else an edge member.
+    Each point that can be in a cluster is identified and then the algorithm moves to the next random point."""
+
+    """Using k-d trees for nearest neighbor search for PCL's Euclidian Clustering (DBSCAN)
+    algorithm to decrease the computational burden.
+    k-d trees segment the Euclidian Space into partitions by divinding each dimension sequentially (at each root)
+    into two each time (forming a tree) using the median for each dimension, same as in the Quick Sort partion method.
+    Each point is then located in a partition and the seach is focussed there instead of the whole space."""
+    
+    """Convert XYZRGB point cloud to XYZ with helper function from pcl_helper, because PCL's 
+    Euclidean Clustering algorithm requires a point cloud with only spatial information."""
+    white_cloud = XYZRGB_to_XYZ(cloud_objects)
+    tree = white_cloud.make_kdtree()
+
+    ##### Create Cluster-Mask Point Cloud to visualize each cluster separately. #####
+
+    # Create a cluster extraction object
+    ec = white_cloud.make_EuclideanClusterExtraction()
+    # Set tolerances for distance threshold (max. Euclidean Distance b/w points)
+    # as well as minimum and maximum cluster size (in points).
+    # Experiment and find values that work for segmenting objects.
+    ec.set_ClusterTolerance(0.02)
+    ec.set_MinClusterSize(10)
+    ec.set_MaxClusterSize(2000)
+    # Search the k-d tree for clusters
+    ec.set_SearchMethod(tree)
+    # Extract indices for each of the discovered clusters
+    cluster_indices = ec.Extract()
+
+    # Assign a color corresponding to each segmented object in scene.
+    cluster_color = get_color_list(len(cluster_indices))
+
+    color_cluster_point_list = []
+
+    for j, indices in enumerate(cluster_indices):
+        for i, indice in enumerate(indices):
+            color_cluster_point_list.append([white_cloud[indice][0],
+                                            white_cloud[indice][1],
+                                            white_cloud[indice][2],
+                                             rgb_to_float(cluster_color[j])])
+
+    # Create new cloud containing all clusters, each with unique color.
+    cluster_cloud = pcl.PointCloud_PointXYZRGB()
+    cluster_cloud.from_list(color_cluster_point_list)
 
     ##### Convert PCL data to ROS messages #####
 
@@ -174,11 +219,13 @@ def pcl_callback(pcl_msg):
     with helper function from pcl_helper."""
     ros_cloud_objects = pcl_to_ros(cloud_objects)
     ros_cloud_table = pcl_to_ros(cloud_table)
+    ros_cluster_cloud = pcl_to_ros(cluster_cloud)
 
     ##### Publish ROS messages #####
     #This is just for testing so we publish the whole input itself.
     pcl_objects_pub.publish(ros_cloud_objects)
     pcl_table_pub.publish(ros_cloud_table)
+    pcl_cluster_pub.publish(ros_cluster_cloud)
 
 # Exercise-3 TODOs:
 
@@ -262,6 +309,13 @@ if __name__ == '__main__':
     # called pcl_table and pcl_objects, respectively.
     pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
     pcl_table_pub = rospy.Publisher("/pcl_table", PointCloud2, queue_size=1)
+    
+    # Creating a publisher to publish the point cloud data for the cluster cloud to topic called pcl_cluster.
+    pcl_cluster_pub = rospy.Publisher("/pcl_cluster", PointCloud2, queue_size=1)
+
+    ##### Initialize color_list #####
+    # This is needed to initalize the color_list attribute of the helper function get_color_list()
+    get_color_list.color_list = []
 
     ##### Spin while node is not shutdown #####
     while not rospy.is_shutdown():
