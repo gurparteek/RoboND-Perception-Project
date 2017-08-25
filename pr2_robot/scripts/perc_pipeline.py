@@ -4,6 +4,13 @@
 NOTE: Need the sensor_stick dir from the Perception Exercise 3, to be in the src directory of the 
 catkin_ws along with RoboND-Perception-Project (see under Exercise 3 code below for more details).
 """
+"""
+NOTE: Depending upon the environment or world, change scene_num = * below and 
+test*.world and pick_list_*.yaml in pick_place_project.launch file in the /pr2_robot/launch/ folder.
+"""
+
+#Enter the test scene number being used.
+scene_num = 3
 
 # Import modules
 import numpy as np
@@ -123,7 +130,7 @@ def pcl_callback(pcl_msg):
     passthrough.set_filter_field_name (filter_axis)
     # Setting axis values to keep only the objects and the flat table top.
     axis_min = 0.605
-    axis_max = 0.72
+    axis_max = 0.85
     # The axis min and max sets the region of interest that the filter leaves out as a window as it passes.
     passthrough.set_filter_limits (axis_min, axis_max)
 
@@ -309,48 +316,94 @@ def pcl_callback(pcl_msg):
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pr2_mover(detected_objects_list)
+        pr2_mover(detected_objects)
     except rospy.ROSInterruptException:
         pass
 
-# function to load parameters and request PickPlace service
+# Function to load parameters and request PickPlace service
 def pr2_mover(object_list):
 
-    # TODO: Initialize variables
+    ##### Initialize variables #####
+    labels = []
+    centroids = []
 
-    # TODO: Get/Read parameters
+    test_scene_num = Int32()
+    object_name = String()
+    arm_name = String()
+    pick_pose = Pose()
+    place_pose = Pose()
+    
+    dict_list=[]
+    global scene_num
+    test_scene_num.data = scene_num
 
-    # TODO: Parse parameters into individual variables
+    ##### Get/read parameters from ros parameter server #####
+
+    """
+    object_list is the header of the pick list yaml files under /pr2_robot/config and the 
+    parameter name which is loaded to ROS paramter server in the project launch file 
+    'pick_place_project.launch' in pr2_robot/launch.
+    """
+    object_list_param = rospy.get_param('/object_list')
+    
+    # Similarly for the dropbox parameters that have the drop positions.
+    dropbox_param = rospy.get_param('/dropbox')
 
     # TODO: Rotate PR2 in place to capture side tables for the collision map
 
-    # TODO: Loop through the pick list
+    ##### Loop through the pick list #####
+    for i in range(0,len(object_list_param)):
 
-        # TODO: Get the PointCloud for a given object and obtain it's centroid
+        ##### Parse parameters into individual variables. #####
 
-        # TODO: Create 'place_pose' for the object
+        # Populate the data field of object_name of std_msgs/String type ros message.
+        object_name_str = object_list_param[i]['name']
+        object_name.data = object_name_str
 
-        # TODO: Assign the arm to be used for pick_place
+        ##### Selecting arm based on group data. #####
+        object_group = object_list_param[i]['group']
+        if object_group == 'green':
+            # Populate the data field of arm of std_msgs/String type ros message.
+            arm_name.data = 'right'
+        else:
+            arm_name.data = 'left'
 
-        # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
+        for j in range(0,len(object_list)):
 
-        # Wait for 'pick_place_routine' service to come up
-        rospy.wait_for_service('pick_place_routine')
+            ##### Check if the object in pick list was detected. #####
+            detected_object = object_list[j]
+            # If the detected object label is the same as the object parameter name.
+            if object_name_str == detected_object.label:
 
-        try:
-            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+                ##### Get the PointCloud for a given object and obtain it's centroid. #####
+                points_arr = ros_to_pcl(detected_object.cloud).to_array()
+                centroid = (np.mean(points_arr, axis=0)[:3])
 
-            # TODO: Insert your message variables to be sent as a service request
-            resp = pick_place_routine(TEST_SCENE_NUM, OBJECT_NAME, WHICH_ARM, PICK_POSE, PLACE_POSE)
+                ##### Centroid position data to ros in pick_pose variable as type geometry_msgs/Pose. #####
+                # Convert the np.float64 type to scalar for ros.
+                pick_pose.position.x = np.asscalar(centroid[0])
+                pick_pose.position.y = np.asscalar(centroid[1])
+                pick_pose.position.z = np.asscalar(centroid[2])
 
-            print ("Response: ",resp.success)
+        ##### Create 'place_pose' for the object. #####
+        for j in range(0,len(dropbox_param)):
+            if object_group == dropbox_param[j]['group']:
+                place_pose.position.x = dropbox_param[j]['position'][0]
+                place_pose.position.y = dropbox_param[j]['position'][1]
+                place_pose.position.z = dropbox_param[j]['position'][2]
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+        ##### Create a list of dictionaries for later output to yaml format. #####
+        yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
+        dict_list.append(yaml_dict)
 
-    # TODO: Output your request parameters into output yaml file
-
-
+    ##### Output your request parameters into output yaml file #####
+    if scene_num == 1:
+        yaml_filename = 'output_1.yaml'
+    elif scene_num == 2:
+        yaml_filename = 'output_2.yaml'
+    else:
+        yaml_filename = 'output_3.yaml'
+    send_to_yaml(yaml_filename, dict_list)
 
 if __name__ == '__main__':
 
@@ -384,7 +437,13 @@ if __name__ == '__main__':
     detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
 
     ##### Load Model From disk #####
-    model = pickle.load(open('model.sav', 'rb'))
+    if scene_num == 1:
+        model_filename = 'model1.sav'
+    elif scene_num == 2:
+        model_filename = 'model2.sav'
+    else:
+        model_filename = 'model3.sav' 
+    model = pickle.load(open(model_filename, 'rb'))
     clf = model['classifier']
     encoder = LabelEncoder()
     encoder.classes_ = model['classes']
