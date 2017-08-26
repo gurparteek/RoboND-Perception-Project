@@ -1,4 +1,4 @@
-#RoboND Project Write-up: 3D Perception by Gurparteek Bath
+# RoboND Project Write-up: 3D Perception by Gurparteek Bath
 
 This write-up contains supporting statements and figures for each [rubric](https://review.udacity.com/#!/rubrics/1067/view) item that is used to assess the project.
 
@@ -113,7 +113,7 @@ For all three tabletop setups (`test*.world`), perform object recognition, then 
 
 <img src="./misc_images/reco3_1.png" width="615" height="443" />
 
-<img src="./misc_images/reco3_1.png" width="615" height="443" />
+<img src="./misc_images/reco3_2.png" width="615" height="443" />
 
 *Accuracy: 7/8*
 
